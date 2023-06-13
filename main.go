@@ -1,51 +1,41 @@
 package main
 
 import (
-    "fmt"
-	"encoding/base64"
+	"fmt"
+	//"encoding/base64"
 	"encoding/json"
 	"log"
+	"net/http"
 	"os"
-    "net/http"
-	"strings"
+
+	//"strings"
 	"time"
 
 	//lksdk "github.com/livekit/server-sdk-go"
 	"github.com/livekit/protocol/auth"
 )
 
-// Decodes a JWT token into a JSON string
-func DecodeJWT(token string) (string, error) {
-	// Split the token into its three parts: header, payload, and signature
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid JWT token format")
+// Generate JSON string with identity and accessToken fields
+func GenerateJSONString(identity, accessToken string) (string, error) {
+	data := struct {
+		Identity    string `json:"identity"`
+		AccessToken string `json:"accessToken"`
+	}{
+		Identity:    identity,
+		AccessToken: accessToken,
 	}
 
-	// Decode and parse the payload part
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	jsonString, err := json.Marshal(data)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode JWT payload: %v", err)
+		return "", fmt.Errorf("failed to generate JSON string: %v", err)
 	}
 
-	var payloadMap map[string]interface{}
-	err = json.Unmarshal(payloadBytes, &payloadMap)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse JWT payload: %v", err)
-	}
-
-	// Encode the payload as a JSON string
-	payloadJSON, err := json.MarshalIndent(payloadMap, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("failed to encode JWT payload as JSON: %v", err)
-	}
-
-	return string(payloadJSON), nil
+	return string(jsonString), nil
 }
 
 func getJoinToken(apiKey, apiSecret, room, identity string) (string, error) {
-    canPublish := true
-    canSubscribe := true
+	canPublish := true
+	canSubscribe := true
 
 	at := auth.NewAccessToken(apiKey, apiSecret)
 	grant := &auth.VideoGrant{
@@ -63,9 +53,8 @@ func getJoinToken(apiKey, apiSecret, room, identity string) (string, error) {
 		fmt.Printf("Error in token generation: %s", err)
 	}
 
-	return DecodeJWT(jwtToken)
+	return GenerateJSONString(identity, jwtToken)
 }
-
 
 func main() {
 	// Create a new logger
@@ -91,7 +80,7 @@ func main() {
 
 		room := "room"
 		if len(queryParams["roomName"]) > 0 {
-			room = queryParams["roomName"][0]	
+			room = queryParams["roomName"][0]
 		}
 
 		key := os.Getenv("APIKEY")
@@ -109,13 +98,13 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-	
+
 		fmt.Fprintf(w, "%v", jointoken)
-		
+
 	}
 
 	// Register the handler function
-    http.HandleFunc("/api/token", token)
+	http.HandleFunc("/api/token", token)
 
 	// Start the server
 	addr := ":" + port
